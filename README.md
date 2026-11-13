@@ -9,6 +9,7 @@
 <img src="https://img.shields.io/badge/LangChain-RAG-1C9C6B?style=for-the-badge&logo=langchain&logoColor=white&labelColor=000000" alt="LangChain">
 <img src="https://img.shields.io/badge/Gemini-LLM-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white&labelColor=000000" alt="Gemini">
 <img src="https://img.shields.io/badge/Hugging%20Face-Embeddings-FFD21E?style=for-the-badge&logo=huggingface&logoColor=white&labelColor=000000" alt="Hugging Face embeddings">
+<img src="https://img.shields.io/badge/FAISS-Vector%20DB-34D399?style=for-the-badge&logo=meta&logoColor=white&labelColor=000000" alt="FAISS">
 <img src="https://img.shields.io/badge/SQLite-History-0F80CC?style=for-the-badge&logo=sqlite&logoColor=white&labelColor=000000" alt="SQLite">
 <img src="https://img.shields.io/badge/License-MIT-FACC15?style=for-the-badge&labelColor=000000" alt="MIT License">
 
@@ -72,7 +73,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 1. **Fingerprint:** the PDF's SHA-256 hash is looked up in SQLite. On a cache hit, the saved vector index is loaded and steps 2–4 are skipped.
 2. **Extract:** `pypdf` reads text page by page, and each page keeps its page number as metadata.
 3. **Chunk:** `RecursiveCharacterTextSplitter` splits text into 800-character chunks with a 150-character overlap, preferring paragraph and sentence boundaries.
-4. **Embed and store:** chunks are embedded **locally on CPU** with Hugging Face `BAAI/bge-small-en-v1.5` into an in-memory vector store, which is saved to disk as JSON.
+4. **Embed and store:** chunks are embedded **locally on CPU** with Hugging Face `BAAI/bge-small-en-v1.5` and indexed in a **FAISS** vector database (inner product on normalised vectors = cosine similarity), which is saved to disk per document.
 
 **Query (every question)**
 
@@ -89,7 +90,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 | PDF parsing | ![pypdf](https://img.shields.io/badge/pypdf-F472B6?labelColor=000000) | Pure Python, no system dependencies |
 | Chunking | ![LangChain](https://img.shields.io/badge/LangChain-1C9C6B?logo=langchain&logoColor=white&labelColor=000000) | Recursive splitter respects natural text boundaries |
 | Embeddings | ![BAAI/bge-small-en-v1.5](https://img.shields.io/badge/BAAI%2Fbge--small--en--v1.5-FFD21E?logo=huggingface&logoColor=white&labelColor=000000) | Strong retrieval model (384 dimensions) that runs locally: free, private and unaffected by API quotas |
-| Vector store | ![InMemoryVectorStore](https://img.shields.io/badge/InMemoryVectorStore-34D399?labelColor=000000) | Exact cosine search; plenty fast at single-document scale |
+| Vector database | ![FAISS](https://img.shields.io/badge/FAISS-34D399?logo=meta&logoColor=white&labelColor=000000) | Meta's library for fast nearest-neighbour search; runs in-process with no server and saves to disk |
 | LLM | ![Gemini Flash-Lite](https://img.shields.io/badge/Gemini%20Flash--Lite-60A5FA?logo=googlegemini&logoColor=white&labelColor=000000) | Low latency, low cost, supports streaming |
 | Storage | ![SQLite](https://img.shields.io/badge/SQLite-0F80CC?logo=sqlite&logoColor=white&labelColor=000000) | Zero-setup persistence for chats and index metadata |
 
@@ -194,7 +195,7 @@ pdf-insight/
 | Citation validation + verification pass | Catches invented or missing page numbers automatically | Adds a second LLM call, but only when the check fails |
 | Local Hugging Face embeddings | Uploads never hit an API quota; document text isn't sent anywhere to be embedded | ~130 MB model download on first start; CPU embedding is slower than an API for very large PDFs |
 | SHA-256 index cache | Same PDF is never embedded twice, saving latency and quota | Indexes are tied to the embedding model that built them |
-| Local SQLite + JSON | Zero infrastructure; chats survive restarts | Single-user and single-machine by design |
+| Local SQLite + FAISS files | Zero infrastructure; chats survive restarts | Single-user and single-machine by design |
 
 ## Evaluation
 
@@ -215,7 +216,8 @@ A formal evaluation is **planned, not yet run**. The intended methodology:
 - **Text-based PDFs only.** Scanned pages and images aren't OCR'd.
 - **Tables, charts and multi-column layouts** may extract out of order.
 - **No conversational memory.** Each question is answered on its own, so follow-ups like *"explain that more simply"* lack context.
-- **Brute-force vector search.** Fine for one document, but doesn't scale to large corpora.
+- **Exact (flat) FAISS index.** Ideal for single documents; very large collections would switch to an approximate index such as IVF or HNSW.
+- **FAISS fallback.** FAISS is a compiled library. On machines that block it (for example Windows Smart App Control), the app logs a warning and uses LangChain's in-memory vector store instead, so it keeps working with the same results.
 - **Shared, single-instance storage.** All chats are visible to anyone using the same instance (including the public demo), and Streamlit Cloud doesn't keep local files across restarts.
 - **Free-tier quotas.** Answers use Gemini's free tier, which limits daily requests. Uploads and search are local and unaffected.
 - **First upload is slower.** The embedding model (~130 MB) downloads once when the app first starts.
@@ -228,7 +230,6 @@ A formal evaluation is **planned, not yet run**. The intended methodology:
 
 ## Roadmap
 
-- [ ] FAISS / ChromaDB vector store for larger collections
 - [ ] Conversational memory (rewrite follow-up questions using chat history)
 - [ ] Hybrid search (BM25 + embeddings) and cross-encoder re-ranking
 - [ ] OCR for scanned PDFs

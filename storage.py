@@ -4,10 +4,12 @@ import uuid
 from contextlib import closing
 from pathlib import Path
 
+from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 
-from rag import EMBEDDING_MODEL_NAME
+from rag import EMBEDDING_MODEL_NAME, faiss_available
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DB_PATH = DATA_DIR / "chat_history.sqlite3"
@@ -67,7 +69,7 @@ def initialize_storage() -> None:
 
 def create_chat(
     document_name: str,
-    vector_db: InMemoryVectorStore,
+    vector_db: FAISS | InMemoryVectorStore,
     chunk_count: int,
     page_count: int,
     document_hash: str | None = None,
@@ -77,8 +79,13 @@ def create_chat(
     chat_id = uuid.uuid4().hex
     VECTOR_DIR.mkdir(parents=True, exist_ok=True)
     if reuse_vector_file is None:
-        vector_file = f"{chat_id}.json"
-        vector_db.dump(str(VECTOR_DIR / vector_file))
+        if isinstance(vector_db, FAISS):
+            # FAISS saves a folder: index.faiss (vectors) + index.pkl (chunk texts).
+            vector_file = chat_id
+            vector_db.save_local(str(VECTOR_DIR / vector_file))
+        else:  # in-memory fallback store
+            vector_file = f"{chat_id}.json"
+            vector_db.dump(str(VECTOR_DIR / vector_file))
     else:
         vector_file = Path(reuse_vector_file).name
 
@@ -155,15 +162,34 @@ def get_chat_by_hash(document_hash: str) -> dict | None:
     return dict(row) if row else None
 
 
+def _index_dir(chat: dict) -> Path:
+    return VECTOR_DIR / Path(chat["vector_file"]).name
+
+
 def vector_index_exists(chat: dict) -> bool:
-    return (VECTOR_DIR / Path(chat["vector_file"]).name).is_file()
+    """True if this chat's index exists and this machine can load it."""
+    path = _index_dir(chat)
+    if path.suffix == ".json":  # saved by the in-memory fallback store
+        return path.is_file()
+    return faiss_available() and (path / "index.faiss").is_file()
 
 
-def load_vector_store(chat: dict, embeddings: Embeddings) -> InMemoryVectorStore:
-    vector_path = VECTOR_DIR / Path(chat["vector_file"]).name
-    if not vector_path.is_file():
-        raise FileNotFoundError(f"Saved index not found: {vector_path}")
-    return InMemoryVectorStore.load(str(vector_path), embeddings)
+def load_vector_store(
+    chat: dict, embeddings: Embeddings
+) -> FAISS | InMemoryVectorStore:
+    index_dir = _index_dir(chat)
+    if not vector_index_exists(chat):
+        raise FileNotFoundError(f"Saved index not found: {index_dir}")
+    if index_dir.suffix == ".json":
+        return InMemoryVectorStore.load(str(index_dir), embeddings)
+    return FAISS.load_local(
+        str(index_dir),
+        embeddings,
+        distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,
+        # index.pkl is a pickle. Safe here because this app only ever loads
+        # files it wrote itself into its own git-ignored data/ folder.
+        allow_dangerous_deserialization=True,
+    )
 
 
 def load_messages(chat_id: str) -> list[dict]:

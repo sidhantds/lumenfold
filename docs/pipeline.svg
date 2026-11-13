@@ -21,7 +21,7 @@
   <rect width="1000" height="520" rx="14" fill="#000000"/>
 
   <text x="24" y="38" fill="#ffffff" font-size="19" font-weight="700">PdfInsight · RAG pipeline</text>
-  <text x="976" y="38" fill="#8b949e" font-size="11" text-anchor="end">Streamlit · LangChain · Hugging Face · Gemini · SQLite</text>
+  <text x="976" y="38" fill="#8b949e" font-size="11" text-anchor="end">Streamlit · LangChain · Hugging Face · FAISS · Gemini · SQLite</text>
 
   <!-- ============ INGESTION ============ -->
   <text class="lane" x="24" y="78">INGESTION · ONCE PER DOCUMENT</text>
@@ -56,8 +56,8 @@
     <text class="s" x="776" y="152" fill="#fde047">HF bge-small · local</text>
 
     <rect x="852" y="104" width="124" height="70" rx="10" fill="#34d399" fill-opacity="0.14" stroke="#34d399" stroke-width="1.5"/>
-    <text class="t" x="914" y="134">Vector store</text>
-    <text class="s" x="914" y="152" fill="#6ee7b7">in-memory · saved JSON</text>
+    <text class="t" x="914" y="134">FAISS index</text>
+    <text class="s" x="914" y="152" fill="#6ee7b7">vector DB · saved to disk</text>
   </g>
 
   <path class="flow" d="M148,139 H160"/>
@@ -123,5 +123,5 @@
   <!-- persistence strip -->
   <rect x="24" y="472" width="660" height="32" rx="8" fill="#ffffff" fill-opacity="0.04" stroke="#30363d"/>
   <circle cx="44" cy="488" r="5" fill="#a78bfa"/>
-  <text x="58" y="492" fill="#c9d1d9" font-size="11">Persistence: chats + messages in SQLite · vector indexes as JSON · all in data/ (git-ignored)</text>
+  <text x="58" y="492" fill="#c9d1d9" font-size="11">Persistence: chats + messages in SQLite · FAISS indexes on disk · all in data/ (git-ignored)</text>
 </svg>

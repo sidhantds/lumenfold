@@ -1,14 +1,19 @@
 import hashlib
+import logging
 import re
 from functools import lru_cache
 from io import BytesIO
 from typing import Protocol
 
+from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.documents import Document
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 NO_EVIDENCE_ANSWER = (
     "I could not find enough information in this document to answer that question."
@@ -18,9 +23,7 @@ CHUNK_OVERLAP = 150
 RETRIEVAL_K = 6
 MAX_CONTEXT_CHARS = 6000
 
-# Runs locally on CPU: no API key, no quota, no per-request cost.
 EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
-# BGE models retrieve better when questions (not passages) carry this instruction.
 EMBEDDING_QUERY_PROMPT = "Represent this sentence for searching relevant passages: "
 
 SYSTEM_PROMPT = f"""You are a precise PDF question-answering assistant.
@@ -88,15 +91,39 @@ def get_embeddings() -> HuggingFaceEmbeddings:
     )
 
 
-def build_vector_store(chunks: list[Document]) -> InMemoryVectorStore:
-    return InMemoryVectorStore.from_documents(
+@lru_cache(maxsize=1)
+def faiss_available() -> bool:
+    """FAISS is a compiled library; some locked-down machines block loading it."""
+    try:
+        import faiss  # noqa: F401
+    except ImportError:
+        logger.warning(
+            "FAISS could not be loaded; using LangChain's in-memory vector store."
+        )
+        return False
+    return True
+
+
+def build_vector_store(chunks: list[Document]) -> FAISS | InMemoryVectorStore:
+    """Embed chunks and index them in FAISS for fast nearest-neighbour search.
+
+    Embeddings are normalised to length 1, so inner product == cosine similarity.
+    Falls back to an in-memory store only if FAISS can't load on this machine.
+    """
+    if not faiss_available():
+        return InMemoryVectorStore.from_documents(
+            documents=chunks,
+            embedding=get_embeddings(),
+        )
+    return FAISS.from_documents(
         documents=chunks,
         embedding=get_embeddings(),
+        distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,
     )
 
 
 def retrieve_documents(
-    vector_db: InMemoryVectorStore,
+    vector_db: FAISS | InMemoryVectorStore,
     query: str,
     k: int = RETRIEVAL_K,
 ) -> list[Document]:

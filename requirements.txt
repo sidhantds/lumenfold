@@ -7,6 +7,10 @@ torch
 sentence-transformers
 langchain-huggingface
 
+# FAISS vector database (CPU)
+faiss-cpu
+langchain-community
+
 # Gemini LLM, RAG plumbing and UI
 langchain-google-genai
 langchain-text-splitters
