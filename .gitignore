@@ -1,0 +1,27 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Local app data
+data/
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# Uploaded documents
+*.pdf
+uploads/
+uploaded_document.pdf
+
+# OS files
+.DS_Store
+Thumbs.db

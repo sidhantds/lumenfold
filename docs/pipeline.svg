@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f87171"/>
+    </marker>
+    <style>
+      .t { fill: #ffffff; font-size: 12.5px; font-weight: 600; text-anchor: middle; }
+      .s { font-size: 10px; text-anchor: middle; }
+      .lane { fill: #8b949e; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
+      .note { font-size: 10.5px; }
+      .flow { stroke: #8b949e; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1000" height="520" rx="14" fill="#000000"/>
+
+  <text x="24" y="38" fill="#ffffff" font-size="19" font-weight="700">PdfInsight · RAG pipeline</text>
+  <text x="976" y="38" fill="#8b949e" font-size="11" text-anchor="end">Streamlit · LangChain · Gemini · SQLite</text>
+
+  <!-- ============ INGESTION ============ -->
+  <text class="lane" x="24" y="78">INGESTION · ONCE PER DOCUMENT</text>
+
+  <!-- cache-hit shortcut -->
+  <path d="M362,104 C362,84 914,84 914,104" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arrow-violet)"/>
+  <text class="note" x="638" y="82" fill="#a78bfa" text-anchor="middle">cache hit → reuse saved index, skip re-embedding</text>
+
+  <g>
+    <rect x="24"  y="104" width="124" height="70" rx="10" fill="#38bdf8" fill-opacity="0.14" stroke="#38bdf8" stroke-width="1.5"/>
+    <text class="t" x="86" y="134">Upload PDF</text>
+    <text class="s" x="86" y="152" fill="#7dd3fc">st.file_uploader</text>
+
+    <rect x="162" y="104" width="124" height="70" rx="10" fill="#a78bfa" fill-opacity="0.14" stroke="#a78bfa" stroke-width="1.5"/>
+    <text class="t" x="224" y="134">SHA-256 hash</text>
+    <text class="s" x="224" y="152" fill="#c4b5fd">document fingerprint</text>
+
+    <rect x="300" y="104" width="124" height="70" rx="10" fill="#a78bfa" fill-opacity="0.14" stroke="#a78bfa" stroke-width="1.5"/>
+    <text class="t" x="362" y="134">Seen before?</text>
+    <text class="s" x="362" y="152" fill="#c4b5fd">lookup in SQLite</text>
+
+    <rect x="438" y="104" width="124" height="70" rx="10" fill="#f472b6" fill-opacity="0.14" stroke="#f472b6" stroke-width="1.5"/>
+    <text class="t" x="500" y="134">Extract text</text>
+    <text class="s" x="500" y="152" fill="#f9a8d4">pypdf · page by page</text>
+
+    <rect x="576" y="104" width="124" height="70" rx="10" fill="#fb923c" fill-opacity="0.14" stroke="#fb923c" stroke-width="1.5"/>
+    <text class="t" x="638" y="134">Chunk</text>
+    <text class="s" x="638" y="152" fill="#fdba74">800 chars · 150 overlap</text>
+
+    <rect x="714" y="104" width="124" height="70" rx="10" fill="#facc15" fill-opacity="0.14" stroke="#facc15" stroke-width="1.5"/>
+    <text class="t" x="776" y="134">Embed</text>
+    <text class="s" x="776" y="152" fill="#fde047">gemini-embedding-001</text>
+
+    <rect x="852" y="104" width="124" height="70" rx="10" fill="#34d399" fill-opacity="0.14" stroke="#34d399" stroke-width="1.5"/>
+    <text class="t" x="914" y="134">Vector store</text>
+    <text class="s" x="914" y="152" fill="#6ee7b7">in-memory · saved JSON</text>
+  </g>
+
+  <path class="flow" d="M148,139 H160"/>
+  <path class="flow" d="M286,139 H298"/>
+  <path class="flow" d="M424,139 H436"/>
+  <text class="note" x="430" y="194" fill="#8b949e" text-anchor="middle">miss</text>
+  <path class="flow" d="M562,139 H574"/>
+  <path class="flow" d="M700,139 H712"/>
+  <path class="flow" d="M838,139 H850"/>
+
+  <!-- vector store feeds retrieval -->
+  <path class="flow" d="M914,174 V226 H362 V284"/>
+  <text class="note" x="640" y="219" fill="#6ee7b7" text-anchor="middle">indexed chunks with page metadata</text>
+
+  <!-- ============ QUERY ============ -->
+  <text class="lane" x="24" y="258">QUERY · EVERY QUESTION</text>
+
+  <g>
+    <rect x="24"  y="284" width="124" height="70" rx="10" fill="#38bdf8" fill-opacity="0.14" stroke="#38bdf8" stroke-width="1.5"/>
+    <text class="t" x="86" y="314">Question</text>
+    <text class="s" x="86" y="332" fill="#7dd3fc">st.chat_input</text>
+
+    <rect x="162" y="284" width="124" height="70" rx="10" fill="#facc15" fill-opacity="0.14" stroke="#facc15" stroke-width="1.5"/>
+    <text class="t" x="224" y="314">Embed query</text>
+    <text class="s" x="224" y="332" fill="#fde047">same embedding model</text>
+
+    <rect x="300" y="284" width="124" height="70" rx="10" fill="#34d399" fill-opacity="0.14" stroke="#34d399" stroke-width="1.5"/>
+    <text class="t" x="362" y="314">Top-6 search</text>
+    <text class="s" x="362" y="332" fill="#6ee7b7">cosine similarity</text>
+
+    <rect x="438" y="284" width="124" height="70" rx="10" fill="#fb923c" fill-opacity="0.14" stroke="#fb923c" stroke-width="1.5"/>
+    <text class="t" x="500" y="314">Grounded prompt</text>
+    <text class="s" x="500" y="332" fill="#fdba74">rules + ≤ 6,000 chars</text>
+
+    <rect x="576" y="284" width="124" height="70" rx="10" fill="#60a5fa" fill-opacity="0.14" stroke="#60a5fa" stroke-width="1.5"/>
+    <text class="t" x="638" y="314">Gemini</text>
+    <text class="s" x="638" y="332" fill="#93c5fd">flash-lite · streamed</text>
+
+    <rect x="714" y="284" width="124" height="70" rx="10" fill="#f87171" fill-opacity="0.14" stroke="#f87171" stroke-width="1.5"/>
+    <text class="t" x="776" y="314">Citation check</text>
+    <text class="s" x="776" y="332" fill="#fca5a5">cited pages ⊆ sources</text>
+
+    <rect x="852" y="284" width="124" height="70" rx="10" fill="#4ade80" fill-opacity="0.14" stroke="#4ade80" stroke-width="1.5"/>
+    <text class="t" x="914" y="314">Answer</text>
+    <text class="s" x="914" y="332" fill="#86efac">+ clickable sources</text>
+  </g>
+
+  <path class="flow" d="M148,319 H160"/>
+  <path class="flow" d="M286,319 H298"/>
+  <path class="flow" d="M424,319 H436"/>
+  <path class="flow" d="M562,319 H574"/>
+  <path class="flow" d="M700,319 H712"/>
+  <path class="flow" d="M838,319 H850"/>
+
+  <!-- verification loop -->
+  <path d="M776,354 V392" stroke="#f87171" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+  <text class="note" x="764" y="378" fill="#fca5a5" text-anchor="end">missing / invalid citations</text>
+  <rect x="714" y="394" width="124" height="62" rx="10" fill="#f87171" fill-opacity="0.14" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text class="t" x="776" y="420">Verify pass</text>
+  <text class="s" x="776" y="438" fill="#fca5a5">2nd LLM call drops claims</text>
+  <path d="M838,425 H914 V356" stroke="#f87171" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+
+  <!-- persistence strip -->
+  <rect x="24" y="472" width="660" height="32" rx="8" fill="#ffffff" fill-opacity="0.04" stroke="#30363d"/>
+  <circle cx="44" cy="488" r="5" fill="#a78bfa"/>
+  <text x="58" y="492" fill="#c9d1d9" font-size="11">Persistence: chats + messages in SQLite · vector indexes as JSON · all in data/ (git-ignored)</text>
+</svg>
