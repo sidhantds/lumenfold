@@ -7,7 +7,8 @@
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=000000" alt="Python 3.11+">
 <img src="https://img.shields.io/badge/Streamlit-UI-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white&labelColor=000000" alt="Streamlit">
 <img src="https://img.shields.io/badge/LangChain-RAG-1C9C6B?style=for-the-badge&logo=langchain&logoColor=white&labelColor=000000" alt="LangChain">
-<img src="https://img.shields.io/badge/Gemini-LLM%20%2B%20Embeddings-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white&labelColor=000000" alt="Gemini">
+<img src="https://img.shields.io/badge/Gemini-LLM-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white&labelColor=000000" alt="Gemini">
+<img src="https://img.shields.io/badge/Hugging%20Face-Embeddings-FFD21E?style=for-the-badge&logo=huggingface&logoColor=white&labelColor=000000" alt="Hugging Face embeddings">
 <img src="https://img.shields.io/badge/SQLite-History-0F80CC?style=for-the-badge&logo=sqlite&logoColor=white&labelColor=000000" alt="SQLite">
 <img src="https://img.shields.io/badge/License-MIT-FACC15?style=for-the-badge&labelColor=000000" alt="MIT License">
 
@@ -34,14 +35,14 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 **▶ [pdf-insight-365.streamlit.app](https://pdf-insight-365.streamlit.app/)**: upload a PDF and start asking questions. No setup needed.
 
 > [!WARNING]
-> The demo is a shared public instance. Chat history is visible to every visitor and is wiped whenever the app restarts, so **don't upload private documents**. It runs on Gemini's free tier, so it may be briefly unavailable if the daily quota is used up.
+> The demo is a shared public instance. Chat history is visible to every visitor and is wiped whenever the app restarts, so **don't upload private documents**. Uploads run fully locally; answers use Gemini's free tier, so answering may be briefly unavailable if its daily quota is used up.
 
 ## Features
 
 | | Feature | Details |
 |:-:|---|---|
 | 📄 | **PDF ingestion** | Page-by-page text extraction with `pypdf`, plus a warning for scanned or low-text PDFs |
-| 🔎 | **Semantic search** | Gemini embeddings + cosine similarity retrieve the top-6 most relevant chunks |
+| 🔎 | **Semantic search** | Local Hugging Face embeddings (`BAAI/bge-small-en-v1.5`) + cosine similarity retrieve the top-6 most relevant chunks, with no API key or quota |
 | 📌 | **Page citations** | Every factual claim is cited as `[Page N]`; click a page to view the exact excerpt used |
 | 🛡️ | **Hallucination guards** | Strict grounded prompt, a fixed "not found" reply, citation validation, and an automatic verification pass |
 | ⚡ | **Streaming answers** | Responses appear token by token |
@@ -71,7 +72,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 1. **Fingerprint:** the PDF's SHA-256 hash is looked up in SQLite. On a cache hit, the saved vector index is loaded and steps 2–4 are skipped.
 2. **Extract:** `pypdf` reads text page by page, and each page keeps its page number as metadata.
 3. **Chunk:** `RecursiveCharacterTextSplitter` splits text into 800-character chunks with a 150-character overlap, preferring paragraph and sentence boundaries.
-4. **Embed and store:** chunks are embedded with `gemini-embedding-001` into an in-memory vector store, which is saved to disk as JSON.
+4. **Embed and store:** chunks are embedded **locally on CPU** with Hugging Face `BAAI/bge-small-en-v1.5` into an in-memory vector store, which is saved to disk as JSON.
 
 **Query (every question)**
 
@@ -87,7 +88,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 | UI | ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white&labelColor=000000) | Fast to build, with chat widgets and streaming built in |
 | PDF parsing | ![pypdf](https://img.shields.io/badge/pypdf-F472B6?labelColor=000000) | Pure Python, no system dependencies |
 | Chunking | ![LangChain](https://img.shields.io/badge/LangChain-1C9C6B?logo=langchain&logoColor=white&labelColor=000000) | Recursive splitter respects natural text boundaries |
-| Embeddings | ![gemini-embedding-001](https://img.shields.io/badge/gemini--embedding--001-FACC15?labelColor=000000) | High-quality semantic vectors (3,072 dimensions) |
+| Embeddings | ![BAAI/bge-small-en-v1.5](https://img.shields.io/badge/BAAI%2Fbge--small--en--v1.5-FFD21E?logo=huggingface&logoColor=white&labelColor=000000) | Strong retrieval model (384 dimensions) that runs locally: free, private and unaffected by API quotas |
 | Vector store | ![InMemoryVectorStore](https://img.shields.io/badge/InMemoryVectorStore-34D399?labelColor=000000) | Exact cosine search; plenty fast at single-document scale |
 | LLM | ![Gemini Flash-Lite](https://img.shields.io/badge/Gemini%20Flash--Lite-60A5FA?logo=googlegemini&logoColor=white&labelColor=000000) | Low latency, low cost, supports streaming |
 | Storage | ![SQLite](https://img.shields.io/badge/SQLite-0F80CC?logo=sqlite&logoColor=white&labelColor=000000) | Zero-setup persistence for chats and index metadata |
@@ -179,7 +180,7 @@ pdf-insight/
 | `CHUNK_OVERLAP` | `150` | `rag.py` | Characters shared between neighbouring chunks |
 | `RETRIEVAL_K` | `6` | `rag.py` | Chunks retrieved per question |
 | `MAX_CONTEXT_CHARS` | `6000` | `rag.py` | Hard cap on context sent to the LLM |
-| Embedding model | `gemini-embedding-001` | `rag.py` | Vectors for chunks and questions |
+| `EMBEDDING_MODEL_NAME` | `BAAI/bge-small-en-v1.5` | `rag.py` | Local Hugging Face model for chunk and question vectors |
 | Chat model | `gemini-3.5-flash-lite` | `app.py` | Answer generation and verification |
 | `GEMINI_API_KEY` | your key | `.env` | Authentication for Gemini |
 
@@ -191,6 +192,7 @@ pdf-insight/
 | Top-6 retrieval + 6k-char cap | Broad evidence while keeping the prompt focused and cheap | Whole-document summaries only see a fraction of a long PDF (~4,800 of ~40,000 chars for the sample paper) |
 | Fixed refusal sentence | Lets the model admit "not found", and the app can detect it | Can be over-cautious on loosely worded questions |
 | Citation validation + verification pass | Catches invented or missing page numbers automatically | Adds a second LLM call, but only when the check fails |
+| Local Hugging Face embeddings | Uploads never hit an API quota; document text isn't sent anywhere to be embedded | ~130 MB model download on first start; CPU embedding is slower than an API for very large PDFs |
 | SHA-256 index cache | Same PDF is never embedded twice, saving latency and quota | Indexes are tied to the embedding model that built them |
 | Local SQLite + JSON | Zero infrastructure; chats survive restarts | Single-user and single-machine by design |
 
@@ -215,7 +217,8 @@ A formal evaluation is **planned, not yet run**. The intended methodology:
 - **No conversational memory.** Each question is answered on its own, so follow-ups like *"explain that more simply"* lack context.
 - **Brute-force vector search.** Fine for one document, but doesn't scale to large corpora.
 - **Shared, single-instance storage.** All chats are visible to anyone using the same instance (including the public demo), and Streamlit Cloud doesn't keep local files across restarts.
-- **Free-tier quotas.** Gemini's free tier limits daily embedding requests, and large PDFs can exhaust it.
+- **Free-tier quotas.** Answers use Gemini's free tier, which limits daily requests. Uploads and search are local and unaffected.
+- **First upload is slower.** The embedding model (~130 MB) downloads once when the app first starts.
 
 ## Security & privacy
 

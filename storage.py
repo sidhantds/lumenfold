@@ -7,9 +7,14 @@ from pathlib import Path
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 
+from rag import EMBEDDING_MODEL_NAME
+
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DB_PATH = DATA_DIR / "chat_history.sqlite3"
-VECTOR_DIR = DATA_DIR / "vectors"
+# Vectors from different embedding models can't be compared, so each model
+# keeps its indexes in its own folder. Indexes built by an older model are
+# then simply "missing" and get rebuilt instead of returning wrong results.
+VECTOR_DIR = DATA_DIR / "vectors" / EMBEDDING_MODEL_NAME.replace("/", "__")
 
 
 def initialize_storage() -> None:

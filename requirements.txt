@@ -1,6 +1,14 @@
+# CPU-only PyTorch: much smaller than the default CUDA build and all
+# Streamlit Cloud (or a laptop without a GPU) can use anyway.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+
+# Local Hugging Face embeddings (BAAI/bge-small-en-v1.5)
+sentence-transformers
+langchain-huggingface
+
+# Gemini LLM, RAG plumbing and UI
 langchain-google-genai
-langchain
-langchain-community
 langchain-text-splitters
 python-dotenv
 pypdf

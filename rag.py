@@ -1,11 +1,12 @@
 import hashlib
 import re
+from functools import lru_cache
 from io import BytesIO
 from typing import Protocol
 
 from langchain_core.documents import Document
 from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
@@ -16,6 +17,11 @@ CHUNK_SIZE = 800
 CHUNK_OVERLAP = 150
 RETRIEVAL_K = 6
 MAX_CONTEXT_CHARS = 6000
+
+# Runs locally on CPU: no API key, no quota, no per-request cost.
+EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+# BGE models retrieve better when questions (not passages) carry this instruction.
+EMBEDDING_QUERY_PROMPT = "Represent this sentence for searching relevant passages: "
 
 SYSTEM_PROMPT = f"""You are a precise PDF question-answering assistant.
 
@@ -68,8 +74,18 @@ def split_pdf_documents(documents: list[Document]) -> list[Document]:
     return splitter.split_documents(documents)
 
 
-def get_embeddings() -> GoogleGenerativeAIEmbeddings:
-    return GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+@lru_cache(maxsize=1)
+def get_embeddings() -> HuggingFaceEmbeddings:
+    """Load the embedding model once per process and reuse it."""
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+        query_encode_kwargs={
+            "normalize_embeddings": True,
+            "prompt": EMBEDDING_QUERY_PROMPT,
+        },
+    )
 
 
 def build_vector_store(chunks: list[Document]) -> InMemoryVectorStore:

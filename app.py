@@ -1,10 +1,10 @@
 import logging
+import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_google_genai._common import GoogleGenerativeAIError
 from pypdf.errors import PdfReadError
 import streamlit as st
 from streamlit.typing import UploadedFile
@@ -131,7 +131,7 @@ def friendly_error_message(error: Exception) -> str:
         )
     if (code is not None and code >= 500) or "timeout" in details:
         return "Gemini is not responding right now. Please try again in a moment."
-    return "Something went wrong while talking to Gemini. Please try again."
+    return "Something went wrong while answering. Please try again."
 
 
 def record_exchange(user_message: dict, assistant_message: dict) -> None:
@@ -147,40 +147,38 @@ def queue_document_processing() -> None:
     )
 
 
-def embedding_error_message(error: GoogleGenerativeAIError) -> str:
-    status_code = getattr(error.__cause__, "code", None)
-    if status_code == 429:
-        return (
-            "Gemini's embedding quota or rate limit was reached. Check the "
-            "Google AI Studio quota and billing, then retry after it resets."
-        )
-    if status_code in (401, 403) or "api key" in str(error).lower():
-        return (
-            "Google rejected the embedding credentials or access. Check the "
-            "API key configured in Streamlit Cloud and confirm the Gemini API "
-            "is enabled for its project."
-        )
-    if status_code == 404:
-        return (
-            "The embedding model is unavailable to this Google API project. "
-            "Check that gemini-embedding-001 is enabled and available."
-        )
-    return (
-        "Gemini could not create document embeddings. Check the Streamlit "
-        "Cloud logs for the Google API status, then verify the API key, model "
-        "access, and quota."
-    )
+def get_gemini_api_key() -> str | None:
+    """Read the Gemini key from Streamlit secrets (cloud) or .env (local)."""
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        try:
+            value = st.secrets.get(name)
+        except Exception:  # no secrets.toml when running locally
+            value = None
+        value = (value or os.getenv(name) or "").strip().strip('"').strip("'")
+        if value:
+            return value
+    return None
 
 
 initialize_storage()
 
+GEMINI_API_KEY = get_gemini_api_key()
+if not GEMINI_API_KEY:
+    st.error(
+        "No Gemini API key found. Add `GEMINI_API_KEY` to `.env` locally, "
+        "or to **Settings → Secrets** on Streamlit Cloud."
+    )
+    st.stop()
+
 
 @st.cache_resource
-def get_llm() -> ChatGoogleGenerativeAI:
+def get_llm(api_key: str) -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
         model="gemini-3.5-flash-lite",
-        thinking_level="medium",
-        retries=2,
+        google_api_key=api_key,
+        thinking_config={"thinking_level": "medium"},
+        max_retries=2,
+        timeout=60,
     )
 
 
@@ -448,12 +446,12 @@ if not st.session_state.document_uploaded:
                     )
         except PdfReadError:
             st.error("This file could not be read as a PDF. Please choose another file.")
-        except GoogleGenerativeAIError as error:
-            logger.exception("Embedding %s failed", uploaded_file.name)
-            st.error(embedding_error_message(error))
         except Exception as error:
             logger.exception("Processing %s failed", uploaded_file.name)
-            st.error(f"Could not process this PDF. {friendly_error_message(error)}")
+            st.error(
+                "Could not process this PDF. Please try again, or try a "
+                "different PDF if the problem continues."
+            )
         finally:
             st.session_state.is_processing = False
 
@@ -503,7 +501,7 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
             prompt = build_prompt(query, documents)
 
             streamed_answer = answer_slot.write_stream(
-                chunk.text for chunk in get_llm().stream(prompt)
+                chunk.text for chunk in get_llm(GEMINI_API_KEY).stream(prompt)
             )
             if not isinstance(streamed_answer, str):
                 raise TypeError("The streamed answer was not plain text.")
@@ -518,7 +516,7 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
                 with st.spinner("Checking the answer against the document..."):
                     answer = "".join(
                         chunk.text
-                        for chunk in get_llm().stream(verification_prompt)
+                        for chunk in get_llm(GEMINI_API_KEY).stream(verification_prompt)
                     ).strip()
                 if not answer:
                     raise RuntimeError(
