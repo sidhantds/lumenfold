@@ -358,7 +358,6 @@ if not st.session_state.document_uploaded:
         "Choose a PDF",
         type=["pdf"],
         key="file_uploader",
-        disabled=st.session_state.is_processing,
         on_change=queue_document_processing,
     )
     if st.session_state.is_processing and uploaded_file is None:
