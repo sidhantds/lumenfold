@@ -13,6 +13,10 @@
 
 <br><br>
 
+<a href="https://pdf-insight-365.streamlit.app/"><img src="https://img.shields.io/badge/%E2%96%B6%20Live%20Demo-pdf--insight--365.streamlit.app-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white&labelColor=000000" alt="Open the live demo"></a>
+
+<br><br>
+
 <img src="docs/screenshots/answer.png" alt="PdfInsight answering a question about a PDF with page citations" width="900">
 
 </div>
@@ -24,6 +28,13 @@
 PdfInsight is a **retrieval-augmented generation (RAG)** app for question answering over PDFs. Upload a document and ask questions in plain English. The app finds the passages most relevant to your question, has Gemini answer **only from those passages**, and shows the source pages so you can check every claim yourself.
 
 **Why it's useful:** general chatbots answer from memory and can make things up. PdfInsight answers from *your* document. When the answer isn't there, it says so instead of guessing.
+
+## Live demo
+
+**▶ [pdf-insight-365.streamlit.app](https://pdf-insight-365.streamlit.app/)**: upload a PDF and start asking questions. No setup needed.
+
+> [!WARNING]
+> The demo is a shared public instance. Chat history is visible to every visitor and is wiped whenever the app restarts, so **don't upload private documents**. It runs on Gemini's free tier, so it may be briefly unavailable if the daily quota is used up.
 
 ## Features
 
@@ -203,7 +214,7 @@ A formal evaluation is **planned, not yet run**. The intended methodology:
 - **Tables, charts and multi-column layouts** may extract out of order.
 - **No conversational memory.** Each question is answered on its own, so follow-ups like *"explain that more simply"* lack context.
 - **Brute-force vector search.** Fine for one document, but doesn't scale to large corpora.
-- **Local, single-user storage.** All chats are visible to anyone using the same instance, so don't deploy it publicly as-is.
+- **Shared, single-instance storage.** All chats are visible to anyone using the same instance (including the public demo), and Streamlit Cloud doesn't keep local files across restarts.
 - **Free-tier quotas.** Gemini's free tier limits daily embedding requests, and large PDFs can exhaust it.
 
 ## Security & privacy
