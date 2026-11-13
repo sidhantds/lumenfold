@@ -1,7 +1,10 @@
+import logging
+
 from dotenv import load_dotenv
 
 load_dotenv()
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai._common import GoogleGenerativeAIError
 from pypdf.errors import PdfReadError
 import streamlit as st
 from streamlit.typing import UploadedFile
@@ -33,6 +36,8 @@ from storage import (
     save_message,
     vector_index_exists,
 )
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="PDF Insight")
 st.markdown(
@@ -99,9 +104,71 @@ def render_citation_warning(answer: str, sources: list[dict]) -> None:
         st.warning("No page citations could be verified for this answer.")
 
 
+def api_status_code(error: BaseException) -> int | None:
+    """Find the HTTP status code of a Gemini API error, if there is one."""
+    current: BaseException | None = error
+    while current is not None:
+        code = getattr(current, "code", None)
+        if isinstance(code, int):
+            return code
+        current = current.__cause__
+    return None
+
+
+def friendly_error_message(error: Exception) -> str:
+    """Turn a Gemini or runtime failure into a short message users can act on."""
+    code = api_status_code(error)
+    details = str(error).lower()
+    if code == 429 or "resource_exhausted" in details or "quota" in details:
+        return (
+            "The Gemini API usage limit has been reached. "
+            "Please wait a minute and try again, or try again later today."
+        )
+    if code in (401, 403) or "api key" in details or "api_key" in details:
+        return (
+            "The Gemini API key is missing or invalid. "
+            "Check the GEMINI_API_KEY setting."
+        )
+    if (code is not None and code >= 500) or "timeout" in details:
+        return "Gemini is not responding right now. Please try again in a moment."
+    return "Something went wrong while talking to Gemini. Please try again."
+
+
+def record_exchange(user_message: dict, assistant_message: dict) -> None:
+    """Save a question and its answer together, only once both exist."""
+    for message in (user_message, assistant_message):
+        st.session_state.messages.append(message)
+        save_message(st.session_state.active_chat_id, message)
+
+
 def queue_document_processing() -> None:
     st.session_state.is_processing = (
         st.session_state.get("file_uploader") is not None
+    )
+
+
+def embedding_error_message(error: GoogleGenerativeAIError) -> str:
+    status_code = getattr(error.__cause__, "code", None)
+    if status_code == 429:
+        return (
+            "Gemini's embedding quota or rate limit was reached. Check the "
+            "Google AI Studio quota and billing, then retry after it resets."
+        )
+    if status_code in (401, 403) or "api key" in str(error).lower():
+        return (
+            "Google rejected the embedding credentials or access. Check the "
+            "API key configured in Streamlit Cloud and confirm the Gemini API "
+            "is enabled for its project."
+        )
+    if status_code == 404:
+        return (
+            "The embedding model is unavailable to this Google API project. "
+            "Check that gemini-embedding-001 is enabled and available."
+        )
+    return (
+        "Gemini could not create document embeddings. Check the Streamlit "
+        "Cloud logs for the Google API status, then verify the API key, model "
+        "access, and quota."
     )
 
 
@@ -381,6 +448,12 @@ if not st.session_state.document_uploaded:
                     )
         except PdfReadError:
             st.error("This file could not be read as a PDF. Please choose another file.")
+        except GoogleGenerativeAIError as error:
+            logger.exception("Embedding %s failed", uploaded_file.name)
+            st.error(embedding_error_message(error))
+        except Exception as error:
+            logger.exception("Processing %s failed", uploaded_file.name)
+            st.error(f"Could not process this PDF. {friendly_error_message(error)}")
         finally:
             st.session_state.is_processing = False
 
@@ -410,59 +483,58 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
 
     if query:
         user_message = {"role": "user", "content": query}
-        st.session_state.messages.append(user_message)
-        save_message(st.session_state.active_chat_id, user_message)
         with st.container(horizontal=True, horizontal_alignment="right"):
             with st.container(width="content", border=True):
                 st.caption("You")
                 st.markdown(query)
 
-        documents = retrieve_documents(st.session_state.vector_db, query)
-        if not documents:
-            assistant_message = {
-                "role": "assistant",
-                "content": NO_EVIDENCE_ANSWER,
-                "sources": [],
-            }
-            st.session_state.messages.append(assistant_message)
-            save_message(st.session_state.active_chat_id, assistant_message)
-            st.rerun()
-
-        sources = build_sources(documents)
-        prompt = build_prompt(query, documents)
-
         st.caption("Assistant")
         answer_slot = st.empty()
-        streamed_answer = answer_slot.write_stream(
-            chunk.text for chunk in get_llm().stream(prompt)
-        )
-        if not isinstance(streamed_answer, str):
-            raise TypeError("The streamed answer was not plain text.")
-        answer = streamed_answer
+        try:
+            documents = retrieve_documents(st.session_state.vector_db, query)
+            if not documents:
+                record_exchange(
+                    user_message,
+                    {"role": "assistant", "content": NO_EVIDENCE_ANSWER, "sources": []},
+                )
+                st.rerun()
 
-        if needs_answer_verification(answer, sources):
-            verification_prompt = build_verification_prompt(
-                query,
-                answer,
-                documents,
+            sources = build_sources(documents)
+            prompt = build_prompt(query, documents)
+
+            streamed_answer = answer_slot.write_stream(
+                chunk.text for chunk in get_llm().stream(prompt)
             )
-            with st.spinner("Checking the answer against the document..."):
-                answer = "".join(
-                    chunk.text
-                    for chunk in get_llm().stream(verification_prompt)
-                ).strip()
-            if not answer:
-                raise RuntimeError("The answer verification request returned no text.")
-            answer_slot.markdown(answer)
+            if not isinstance(streamed_answer, str):
+                raise TypeError("The streamed answer was not plain text.")
+            answer = streamed_answer
 
-        render_citation_warning(answer, sources)
-        assistant_index = len(st.session_state.messages)
-        render_sources(sources, assistant_index)
-
-        assistant_message = {
-            "role": "assistant",
-            "content": answer,
-            "sources": sources,
-        }
-        st.session_state.messages.append(assistant_message)
-        save_message(st.session_state.active_chat_id, assistant_message)
+            if needs_answer_verification(answer, sources):
+                verification_prompt = build_verification_prompt(
+                    query,
+                    answer,
+                    documents,
+                )
+                with st.spinner("Checking the answer against the document..."):
+                    answer = "".join(
+                        chunk.text
+                        for chunk in get_llm().stream(verification_prompt)
+                    ).strip()
+                if not answer:
+                    raise RuntimeError(
+                        "The answer verification request returned no text."
+                    )
+                answer_slot.markdown(answer)
+        except Exception as error:
+            logger.exception("Answering a question failed")
+            answer_slot.error(
+                f"{friendly_error_message(error)} Your question was not saved."
+            )
+        else:
+            render_citation_warning(answer, sources)
+            assistant_index = len(st.session_state.messages) + 1
+            render_sources(sources, assistant_index)
+            record_exchange(
+                user_message,
+                {"role": "assistant", "content": answer, "sources": sources},
+            )
