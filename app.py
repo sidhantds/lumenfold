@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 
 from dotenv import load_dotenv
 
@@ -138,7 +139,11 @@ def record_exchange(user_message: dict, assistant_message: dict) -> None:
     """Save a question and its answer together, only once both exist."""
     for message in (user_message, assistant_message):
         st.session_state.messages.append(message)
-        save_message(st.session_state.active_chat_id, message)
+        save_message(
+            st.session_state.active_chat_id,
+            message,
+            owner_id=st.session_state.chat_owner_id,
+        )
 
 
 def queue_document_processing() -> None:
@@ -192,6 +197,7 @@ st.session_state.setdefault("document_hash", None)
 st.session_state.setdefault("pending_question", None)
 st.session_state.setdefault("active_source", None)
 st.session_state.setdefault("active_chat_id", None)
+st.session_state.setdefault("chat_owner_id", uuid.uuid4().hex)
 st.session_state.setdefault("history_load_error", None)
 st.session_state.setdefault("is_processing", False)
 st.session_state.setdefault("low_text_warning", False)
@@ -207,12 +213,14 @@ if (
         st.session_state.page_count,
         st.session_state.document_hash,
         st.session_state.low_text_warning,
+        owner_id=st.session_state.chat_owner_id,
     )
 
 
 def process_uploaded_document(uploaded_file: UploadedFile, status) -> bool:
     document_hash = get_file_hash(uploaded_file)
-    existing_chat = get_chat_by_hash(document_hash)
+    owner_id = st.session_state.chat_owner_id
+    existing_chat = get_chat_by_hash(document_hash, owner_id=owner_id)
     reuse_vector_file = None
 
     if existing_chat and vector_index_exists(existing_chat):
@@ -262,6 +270,7 @@ def process_uploaded_document(uploaded_file: UploadedFile, status) -> bool:
         document_hash,
         low_text_warning,
         reuse_vector_file,
+        owner_id=owner_id,
     )
     st.session_state.history_load_error = None
     return True
@@ -312,12 +321,14 @@ def render_message(message, message_index: int) -> None:
 with st.sidebar:
     st.header("PdfInsight")
     if st.button("New chat", use_container_width=True):
+        chat_owner_id = st.session_state.chat_owner_id
         st.session_state.clear()
+        st.session_state.chat_owner_id = chat_owner_id
         st.rerun()
 
-    saved_chats = list_chats()
+    saved_chats = list_chats(owner_id=st.session_state.chat_owner_id)
     st.subheader("Previous Chats")
-    st.caption("Previous chats are saved locally on this computer.")
+    st.caption("Your chats are private to this browser session.")
     if not saved_chats:
         st.caption("No previous chats yet.")
     for chat in saved_chats:
@@ -330,11 +341,17 @@ with st.sidebar:
             type="primary" if is_active else "secondary",
             use_container_width=True,
         ):
-            saved_chat = get_chat(chat_id)
+            saved_chat = get_chat(
+                chat_id,
+                owner_id=st.session_state.chat_owner_id,
+            )
             if saved_chat is None:
                 st.error("This saved chat could not be found.")
             else:
-                st.session_state.messages = load_messages(chat_id)
+                st.session_state.messages = load_messages(
+                    chat_id,
+                    owner_id=st.session_state.chat_owner_id,
+                )
                 st.session_state.active_chat_id = chat_id
                 st.session_state.document_name = saved_chat["document_name"]
                 st.session_state.chunk_count = saved_chat["chunk_count"]
@@ -375,6 +392,7 @@ with st.sidebar:
             clear_conversation(
                 st.session_state.active_chat_id,
                 st.session_state.document_name,
+                owner_id=st.session_state.chat_owner_id,
             )
             st.session_state.messages = []
             st.session_state.active_source = None

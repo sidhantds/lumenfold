@@ -36,7 +36,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 **▶ [pdf-insight-365.streamlit.app](https://pdf-insight-365.streamlit.app/)**: upload a PDF and start asking questions. No setup needed.
 
 > [!WARNING]
-> The demo is a shared public instance. Chat history is visible to every visitor and is wiped whenever the app restarts, so **don't upload private documents**. Uploads run fully locally; answers use Gemini's free tier, so answering may be briefly unavailable if its daily quota is used up.
+> The demo is a shared public instance. Chat history is private to the current browser session and is wiped whenever the app restarts; it does not follow you to another device. Still, **don't upload private documents** to a public demo. Answers use Gemini's free tier, so answering may be briefly unavailable if its daily quota is used up.
 
 ## Features
 
@@ -47,7 +47,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 | 📌 | **Page citations** | Every factual claim is cited as `[Page N]`; click a page to view the exact excerpt used |
 | 🛡️ | **Hallucination guards** | Strict grounded prompt, a fixed "not found" reply, citation validation, and an automatic verification pass |
 | ⚡ | **Streaming answers** | Responses appear token by token |
-| 💾 | **Persistent chats** | Chat history in SQLite; reopen any previous conversation from the sidebar |
+| 💾 | **Session-private chats** | Chat history in SQLite; reopen conversations from the same browser session |
 | ♻️ | **Index caching** | SHA-256 fingerprint of each PDF: re-uploading the same file reuses its saved index with no new embedding calls |
 
 ## Screenshots

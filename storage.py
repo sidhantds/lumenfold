@@ -27,6 +27,7 @@ def initialize_storage() -> None:
                 """
                 CREATE TABLE IF NOT EXISTS chats (
                     id TEXT PRIMARY KEY,
+                    owner_id TEXT,
                     title TEXT NOT NULL,
                     document_name TEXT NOT NULL,
                     vector_file TEXT NOT NULL,
@@ -42,6 +43,8 @@ def initialize_storage() -> None:
             columns = {
                 row[1] for row in connection.execute("PRAGMA table_info(chats)")
             }
+            if "owner_id" not in columns:
+                connection.execute("ALTER TABLE chats ADD COLUMN owner_id TEXT")
             if "page_count" not in columns:
                 connection.execute(
                     "ALTER TABLE chats ADD COLUMN page_count INTEGER NOT NULL DEFAULT 0"
@@ -75,6 +78,8 @@ def create_chat(
     document_hash: str | None = None,
     low_text_warning: bool = False,
     reuse_vector_file: str | None = None,
+    *,
+    owner_id: str,
 ) -> str:
     chat_id = uuid.uuid4().hex
     VECTOR_DIR.mkdir(parents=True, exist_ok=True)
@@ -94,13 +99,14 @@ def create_chat(
             connection.execute(
                 """
                 INSERT INTO chats (
-                    id, title, document_name, vector_file, chunk_count, page_count,
-                    document_hash, low_text_warning
+                    id, owner_id, title, document_name, vector_file, chunk_count,
+                    page_count, document_hash, low_text_warning
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     chat_id,
+                    owner_id,
                     Path(document_name).stem,
                     document_name,
                     vector_file,
@@ -113,7 +119,7 @@ def create_chat(
     return chat_id
 
 
-def list_chats() -> list[dict]:
+def list_chats(*, owner_id: str) -> list[dict]:
     with closing(sqlite3.connect(DB_PATH)) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
@@ -122,13 +128,15 @@ def list_chats() -> list[dict]:
                 id, title, document_name, chunk_count, page_count,
                 document_hash, low_text_warning, updated_at
             FROM chats
+            WHERE owner_id = ?
             ORDER BY updated_at DESC
-            """
+            """,
+            (owner_id,),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def get_chat(chat_id: str) -> dict | None:
+def get_chat(chat_id: str, *, owner_id: str) -> dict | None:
     with closing(sqlite3.connect(DB_PATH)) as connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(
@@ -137,14 +145,14 @@ def get_chat(chat_id: str) -> dict | None:
                 id, title, document_name, vector_file, chunk_count, page_count,
                 document_hash, low_text_warning
             FROM chats
-            WHERE id = ?
+            WHERE id = ? AND owner_id = ?
             """,
-            (chat_id,),
+            (chat_id, owner_id),
         ).fetchone()
     return dict(row) if row else None
 
 
-def get_chat_by_hash(document_hash: str) -> dict | None:
+def get_chat_by_hash(document_hash: str, *, owner_id: str) -> dict | None:
     with closing(sqlite3.connect(DB_PATH)) as connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(
@@ -153,11 +161,11 @@ def get_chat_by_hash(document_hash: str) -> dict | None:
                 id, title, document_name, vector_file, chunk_count, page_count,
                 document_hash, low_text_warning
             FROM chats
-            WHERE document_hash = ?
+            WHERE document_hash = ? AND owner_id = ?
             ORDER BY updated_at DESC
             LIMIT 1
             """,
-            (document_hash,),
+            (document_hash, owner_id),
         ).fetchone()
     return dict(row) if row else None
 
@@ -192,16 +200,17 @@ def load_vector_store(
     )
 
 
-def load_messages(chat_id: str) -> list[dict]:
+def load_messages(chat_id: str, *, owner_id: str) -> list[dict]:
     with closing(sqlite3.connect(DB_PATH)) as connection:
         rows = connection.execute(
             """
-            SELECT role, content, sources
+            SELECT messages.role, messages.content, messages.sources
             FROM messages
-            WHERE chat_id = ?
-            ORDER BY id
+            JOIN chats ON chats.id = messages.chat_id
+            WHERE messages.chat_id = ? AND chats.owner_id = ?
+            ORDER BY messages.id
             """,
-            (chat_id,),
+            (chat_id, owner_id),
         ).fetchall()
     return [
         {"role": role, "content": content, "sources": json.loads(sources)}
@@ -209,17 +218,29 @@ def load_messages(chat_id: str) -> list[dict]:
     ]
 
 
-def save_message(chat_id: str, message: dict) -> None:
+def save_message(chat_id: str, message: dict, *, owner_id: str) -> None:
     sources = json.dumps(message.get("sources", []))
     with closing(sqlite3.connect(DB_PATH)) as connection:
         with connection:
-            connection.execute(
+            inserted = connection.execute(
                 """
                 INSERT INTO messages (chat_id, role, content, sources)
-                VALUES (?, ?, ?, ?)
+                SELECT ?, ?, ?, ?
+                WHERE EXISTS (
+                    SELECT 1 FROM chats WHERE id = ? AND owner_id = ?
+                )
                 """,
-                (chat_id, message["role"], message["content"], sources),
+                (
+                    chat_id,
+                    message["role"],
+                    message["content"],
+                    sources,
+                    chat_id,
+                    owner_id,
+                ),
             )
+            if inserted.rowcount != 1:
+                raise ValueError("Chat does not belong to this browser session.")
             if message["role"] == "user":
                 has_user_message = connection.execute(
                     """
@@ -238,31 +259,50 @@ def save_message(chat_id: str, message: dict) -> None:
                         """
                         UPDATE chats
                         SET title = ?, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
+                        WHERE id = ? AND owner_id = ?
                         """,
-                        (title, chat_id),
+                        (title, chat_id, owner_id),
                     )
                 else:
                     connection.execute(
-                        "UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (chat_id,),
+                        """
+                        UPDATE chats SET updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND owner_id = ?
+                        """,
+                        (chat_id, owner_id),
                     )
             else:
                 connection.execute(
-                    "UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (chat_id,),
+                    """
+                    UPDATE chats SET updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND owner_id = ?
+                    """,
+                    (chat_id, owner_id),
                 )
 
 
-def clear_conversation(chat_id: str, document_name: str) -> None:
+def clear_conversation(
+    chat_id: str, document_name: str, *, owner_id: str
+) -> None:
     with closing(sqlite3.connect(DB_PATH)) as connection:
         with connection:
-            connection.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
             connection.execute(
+                """
+                DELETE FROM messages
+                WHERE chat_id = ?
+                AND EXISTS (
+                    SELECT 1 FROM chats WHERE id = ? AND owner_id = ?
+                )
+                """,
+                (chat_id, chat_id, owner_id),
+            )
+            updated = connection.execute(
                 """
                 UPDATE chats
                 SET title = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = ? AND owner_id = ?
                 """,
-                (Path(document_name).stem, chat_id),
+                (Path(document_name).stem, chat_id, owner_id),
             )
+            if updated.rowcount != 1:
+                raise ValueError("Chat does not belong to this browser session.")
