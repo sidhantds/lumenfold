@@ -1,5 +1,6 @@
 # Calm research-tool look: colour carries meaning, not decoration.
-# Teal = act / AI / verified · amber = review · red = risk or unsupported.
+# Accent (gold in dark, teal in light) = act / active · amber = review ·
+# red = risk or unsupported · green = verified.
 # Both [theme.light] and [theme.dark] are defined, so visitors can switch
 # modes from the ⋮ menu → Settings. Dark is the default.
 
@@ -16,26 +17,27 @@ showWidgetBorder = true
 showSidebarBorder = true
 linkUnderline = false
 
+# Dark: near-black graphite with a gold accent.
 [theme.dark]
-primaryColor = "#2DD4BF"
-backgroundColor = "#0B1220"
-secondaryBackgroundColor = "#111A2B"
-textColor = "#E8EDF5"
-linkColor = "#60A5FA"
-borderColor = "#24324A"
-codeBackgroundColor = "#111A2B"
-greenColor = "#34D399"
-yellowColor = "#FBBF24"
-orangeColor = "#FBBF24"
-redColor = "#F87171"
-blueColor = "#60A5FA"
-grayColor = "#9AA8BD"
+primaryColor = "#C9A227"
+backgroundColor = "#0C0D10"
+secondaryBackgroundColor = "#16181D"
+textColor = "#EDEEF0"
+linkColor = "#E3BC3A"
+borderColor = "#23262C"
+codeBackgroundColor = "#111216"
+greenColor = "#7FBF8E"
+yellowColor = "#D9A441"
+orangeColor = "#D9A441"
+redColor = "#E06A5A"
+blueColor = "#7FA6C9"
+grayColor = "#A6ABB4"
 
 [theme.dark.sidebar]
-backgroundColor = "#111A2B"
-secondaryBackgroundColor = "#18233A"
-textColor = "#E8EDF5"
-borderColor = "#24324A"
+backgroundColor = "#111216"
+secondaryBackgroundColor = "#16181D"
+textColor = "#EDEEF0"
+borderColor = "#23262C"
 
 [theme.light]
 primaryColor = "#0F766E"

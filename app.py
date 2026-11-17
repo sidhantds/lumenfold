@@ -56,15 +56,17 @@ st.set_page_config(page_title="PDF Insight")
 # Teal = act / AI / verified · amber = review · red = risk or unsupported.
 PALETTES = {
     "dark": {
-        "accent": "#2DD4BF",
-        "accent_hover": "#5EEAD4",
-        "elevated": "#18233A",
-        "muted": "#9AA8BD",
-        "info": "#60A5FA",
-        "warning": "#FBBF24",
-        "error": "#F87171",
-        "evidence": "rgba(253, 230, 138, 0.20)",
-        "evidence_edge": "#FDE68A",
+        "accent": "#C9A227",
+        "accent_hover": "#E3BC3A",
+        "elevated": "#16181D",
+        "muted": "#A6ABB4",
+        "info": "#7FA6C9",
+        # Gold is too close to the amber warning, so the ring starts neutral.
+        "ring": "#A6ABB4",
+        "warning": "#D9A441",
+        "error": "#E06A5A",
+        "evidence": "rgba(201, 162, 39, 0.16)",
+        "evidence_edge": "#C9A227",
     },
     "light": {
         "accent": "#0F766E",
@@ -72,6 +74,7 @@ PALETTES = {
         "elevated": "#F1F5F9",
         "muted": "#64748B",
         "info": "#0F766E",
+        "ring": "#0F766E",
         "warning": "#B45309",
         "error": "#B91C1C",
         "evidence": "#FEF3C7",
@@ -99,8 +102,8 @@ st.markdown(
     }}
     section[data-testid="stSidebar"] .stButton > button:hover {{
         background: {COLORS["elevated"]};
-        border-color: {COLORS["accent"]};
-        color: {COLORS["accent"]};
+        border-color: {COLORS["accent_hover"]};
+        color: {COLORS["accent_hover"]};
     }}
     section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {{
         background: {COLORS["elevated"]};
@@ -233,7 +236,7 @@ def render_usage_row(usage: dict) -> None:
     elif fraction >= 0.8:
         color = COLORS["warning"]
     else:
-        color = COLORS["accent"]
+        color = COLORS["ring"]
 
     total_tokens = usage["input_tokens"] + usage["output_tokens"]
     tooltip = html.escape(
