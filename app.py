@@ -94,7 +94,7 @@ st.markdown(
         text-align: left;
     }
 
-    /* Claude-style status row under the chat box: model · thinking · usage ring */
+    /* Claude-style status row under the chat box: model · usage ring */
     .usage-row {
         display: flex;
         justify-content: flex-end;
@@ -196,7 +196,7 @@ def usage_limit_reached(usage: dict) -> bool:
 
 
 def render_usage_row(usage: dict) -> None:
-    """Small status row like Claude's: model name, thinking level, usage ring."""
+    """Small status row like Claude's: model name and usage ring."""
     used = usage["questions"]
     fraction = min(used / DAILY_QUESTION_LIMIT, 1.0)
     if usage_limit_reached(usage):
@@ -218,7 +218,6 @@ def render_usage_row(usage: dict) -> None:
         f"""
         <div class="usage-row">
           <span class="model">{GEMINI_MODEL_LABEL}</span>
-          <span class="muted">{THINKING_LEVEL.capitalize()}</span>
           <span class="ring" title="{tooltip}">
             <span class="muted">{used}/{DAILY_QUESTION_LIMIT}</span>
             <span class="dial" style="background: conic-gradient({color} {fraction * 360:.0f}deg, #3f3f46 0deg);"></span>
