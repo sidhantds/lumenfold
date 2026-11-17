@@ -1,13 +1,59 @@
+# Calm research-tool look: colour carries meaning, not decoration.
+# Teal = act / AI / verified · amber = review · red = risk or unsupported.
+# Both [theme.light] and [theme.dark] are defined, so visitors can switch
+# modes from the ⋮ menu → Settings. Dark is the default.
+
 [theme]
 base = "dark"
-primaryColor = "#10A37F"
-backgroundColor = "#212121"
-secondaryBackgroundColor = "#141414"
-textColor = "#F4F4F5"
-linkColor = "#10A37F"
-borderColor = "#303030"
-font = "sans-serif"
-baseRadius = "medium"
-buttonRadius = "medium"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+headingFontWeights = [700, 600, 600, 600, 500, 500]
+baseRadius = "12px"
+buttonRadius = "12px"
 showWidgetBorder = true
 showSidebarBorder = true
+linkUnderline = false
+
+[theme.dark]
+primaryColor = "#2DD4BF"
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#111A2B"
+textColor = "#E8EDF5"
+linkColor = "#60A5FA"
+borderColor = "#24324A"
+codeBackgroundColor = "#111A2B"
+greenColor = "#34D399"
+yellowColor = "#FBBF24"
+orangeColor = "#FBBF24"
+redColor = "#F87171"
+blueColor = "#60A5FA"
+grayColor = "#9AA8BD"
+
+[theme.dark.sidebar]
+backgroundColor = "#111A2B"
+secondaryBackgroundColor = "#18233A"
+textColor = "#E8EDF5"
+borderColor = "#24324A"
+
+[theme.light]
+primaryColor = "#0F766E"
+backgroundColor = "#F7F8FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0F172A"
+linkColor = "#0F766E"
+borderColor = "#E2E8F0"
+codeBackgroundColor = "#FFFFFF"
+greenColor = "#15803D"
+yellowColor = "#B45309"
+orangeColor = "#B45309"
+redColor = "#B91C1C"
+blueColor = "#0F766E"
+grayColor = "#64748B"
+
+[theme.light.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F7F8FA"
+textColor = "#0F172A"
+borderColor = "#E2E8F0"

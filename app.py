@@ -51,51 +51,80 @@ DAILY_QUESTION_LIMIT = 20  # per visitor
 GLOBAL_DAILY_QUESTION_LIMIT = 500  # across all visitors
 
 st.set_page_config(page_title="PDF Insight")
+
+# Semantic colours per mode (base colours live in .streamlit/config.toml).
+# Teal = act / AI / verified · amber = review · red = risk or unsupported.
+PALETTES = {
+    "dark": {
+        "accent": "#2DD4BF",
+        "accent_hover": "#5EEAD4",
+        "elevated": "#18233A",
+        "muted": "#9AA8BD",
+        "info": "#60A5FA",
+        "warning": "#FBBF24",
+        "error": "#F87171",
+        "evidence": "rgba(253, 230, 138, 0.20)",
+        "evidence_edge": "#FDE68A",
+    },
+    "light": {
+        "accent": "#0F766E",
+        "accent_hover": "#115E59",
+        "elevated": "#F1F5F9",
+        "muted": "#64748B",
+        "info": "#0F766E",
+        "warning": "#B45309",
+        "error": "#B91C1C",
+        "evidence": "#FEF3C7",
+        "evidence_edge": "#D97706",
+    },
+}
+COLORS = PALETTES["light" if st.context.theme.type == "light" else "dark"]
+
 st.markdown(
-    """
+    f"""
     <style>
-    section[data-testid="stSidebar"] {
-        background-color: #141414;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap');
 
-    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #f4f4f5;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-        color: #a1a1aa !important;
-    }
-
-    section[data-testid="stSidebar"] .stButton > button {
+    /* Sidebar chat list: left-aligned, wrapping rows. Colours come from the theme. */
+    section[data-testid="stSidebar"] .stButton > button {{
         width: 100%;
         min-height: 48px;
         height: auto;
         padding: 10px 12px;
-        border: 1px solid #303030;
-        border-radius: 11px;
-        background: #212121;
-        color: #f4f4f5;
         text-align: left;
         justify-content: flex-start !important;
         white-space: normal;
         overflow-wrap: anywhere;
-    }
-
-    section[data-testid="stSidebar"] .stButton > button:hover,
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] > button {
-        border-color: #10a37f;
-        background: #303030;
-        color: #10a37f;
-    }
-
-    section[data-testid="stSidebar"] .stButton > button p {
+        box-shadow: none;
+    }}
+    section[data-testid="stSidebar"] .stButton > button:hover {{
+        background: {COLORS["elevated"]};
+        border-color: {COLORS["accent"]};
+        color: {COLORS["accent"]};
+    }}
+    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {{
+        background: {COLORS["elevated"]};
+        border-color: {COLORS["accent"]};
+        color: {COLORS["accent"]};
+    }}
+    section[data-testid="stSidebar"] .stButton > button p {{
         width: 100%;
         text-align: left;
-    }
+    }}
+
+    /* Evidence excerpt: quiet, serif, highlighted like marked-up PDF text */
+    .evidence {{
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 15.5px;
+        line-height: 1.6;
+        padding: 12px 16px;
+        border-left: 3px solid {COLORS["evidence_edge"]};
+        border-radius: 0 12px 12px 0;
+        background: {COLORS["evidence"]};
+    }}
 
     /* Claude-style status row under the chat box: model · usage ring */
-    .usage-row {
+    .usage-row {{
         display: flex;
         justify-content: flex-end;
         align-items: center;
@@ -104,23 +133,23 @@ st.markdown(
         font-size: 13px;
         line-height: 1;
         user-select: none;
-    }
-    .usage-row .model { color: #f4f4f5; }
-    .usage-row .muted { color: #8b8b93; }
-    .usage-row .ring {
+    }}
+    .usage-row .model {{ color: inherit; font-weight: 500; }}
+    .usage-row .muted {{ color: {COLORS["muted"]}; }}
+    .usage-row .ring {{
         display: inline-flex;
         align-items: center;
         gap: 7px;
         cursor: default;
-    }
+    }}
     /* Progress ring: a conic gradient with the centre masked out */
-    .usage-row .dial {
+    .usage-row .dial {{
         width: 16px;
         height: 16px;
         border-radius: 50%;
         -webkit-mask: radial-gradient(circle, transparent 5px, #000 5.5px);
         mask: radial-gradient(circle, transparent 5px, #000 5.5px);
-    }
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -200,11 +229,11 @@ def render_usage_row(usage: dict) -> None:
     used = usage["questions"]
     fraction = min(used / DAILY_QUESTION_LIMIT, 1.0)
     if usage_limit_reached(usage):
-        color = "#f87171"
+        color = COLORS["error"]
     elif fraction >= 0.8:
-        color = "#fbbf24"
+        color = COLORS["warning"]
     else:
-        color = "#60a5fa"
+        color = COLORS["accent"]
 
     total_tokens = usage["input_tokens"] + usage["output_tokens"]
     tooltip = html.escape(
@@ -220,7 +249,7 @@ def render_usage_row(usage: dict) -> None:
           <span class="model">{GEMINI_MODEL_LABEL}</span>
           <span class="ring" title="{tooltip}">
             <span class="muted">{used}/{DAILY_QUESTION_LIMIT}</span>
-            <span class="dial" style="background: conic-gradient({color} {fraction * 360:.0f}deg, #3f3f46 0deg);"></span>
+            <span class="dial" style="background: conic-gradient({color} {fraction * 360:.0f}deg, rgba(148, 163, 184, 0.35) 0deg);"></span>
           </span>
         </div>
         """
@@ -391,7 +420,7 @@ def render_sources(sources, message_index: int) -> None:
             if len(content) > 300:
                 preview += "..."
             st.caption(f"Page {active_source[1]} excerpt")
-            st.write(preview)
+            st.html(f'<div class="evidence">{html.escape(preview)}</div>')
 
 
 def render_message(message, message_index: int) -> None:
