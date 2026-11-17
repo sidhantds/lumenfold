@@ -68,6 +68,58 @@ def initialize_storage() -> None:
                 )
                 """
             )
+            # One row per visitor per day (UTC): powers the demo's daily limits.
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS usage (
+                    owner_id TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    questions INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (owner_id, day)
+                )
+                """
+            )
+
+
+def record_usage(owner_id: str, input_tokens: int, output_tokens: int) -> None:
+    """Count one answered question and the Gemini tokens it used today."""
+    with closing(sqlite3.connect(DB_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO usage (owner_id, day, questions, input_tokens, output_tokens)
+                VALUES (?, date('now'), 1, ?, ?)
+                ON CONFLICT (owner_id, day) DO UPDATE SET
+                    questions = questions + 1,
+                    input_tokens = input_tokens + excluded.input_tokens,
+                    output_tokens = output_tokens + excluded.output_tokens
+                """,
+                (owner_id, input_tokens, output_tokens),
+            )
+
+
+def get_usage_today(owner_id: str) -> dict:
+    """This visitor's usage today, plus the question total across all visitors."""
+    with closing(sqlite3.connect(DB_PATH)) as connection:
+        row = connection.execute(
+            """
+            SELECT questions, input_tokens, output_tokens FROM usage
+            WHERE owner_id = ? AND day = date('now')
+            """,
+            (owner_id,),
+        ).fetchone()
+        (all_questions,) = connection.execute(
+            "SELECT COALESCE(SUM(questions), 0) FROM usage WHERE day = date('now')"
+        ).fetchone()
+    questions, input_tokens, output_tokens = row or (0, 0, 0)
+    return {
+        "questions": questions,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "all_questions": all_questions,
+    }
 
 
 def create_chat(

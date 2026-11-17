@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import uuid
@@ -30,15 +31,24 @@ from storage import (
     create_chat,
     get_chat,
     get_chat_by_hash,
+    get_usage_today,
     initialize_storage,
     list_chats,
     load_messages,
     load_vector_store,
+    record_usage,
     save_message,
     vector_index_exists,
 )
 
 logger = logging.getLogger(__name__)
+
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL_LABEL = "Gemini 3.5 Flash-Lite"
+THINKING_LEVEL = "medium"
+# Daily limits (reset at 00:00 UTC) keep the public demo within the free tier.
+DAILY_QUESTION_LIMIT = 20  # per visitor
+GLOBAL_DAILY_QUESTION_LIMIT = 500  # across all visitors
 
 st.set_page_config(page_title="PDF Insight")
 st.markdown(
@@ -82,6 +92,34 @@ st.markdown(
     section[data-testid="stSidebar"] .stButton > button p {
         width: 100%;
         text-align: left;
+    }
+
+    /* Claude-style status row under the chat box: model · thinking · usage ring */
+    .usage-row {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 14px;
+        padding: 2px 6px 0;
+        font-size: 13px;
+        line-height: 1;
+        user-select: none;
+    }
+    .usage-row .model { color: #f4f4f5; }
+    .usage-row .muted { color: #8b8b93; }
+    .usage-row .ring {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        cursor: default;
+    }
+    /* Progress ring: a conic gradient with the centre masked out */
+    .usage-row .dial {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        -webkit-mask: radial-gradient(circle, transparent 5px, #000 5.5px);
+        mask: radial-gradient(circle, transparent 5px, #000 5.5px);
     }
     </style>
     """,
@@ -146,6 +184,60 @@ def record_exchange(user_message: dict, assistant_message: dict) -> None:
         )
 
 
+def format_tokens(count: int) -> str:
+    return f"{count / 1000:.1f}k" if count >= 1000 else str(count)
+
+
+def usage_limit_reached(usage: dict) -> bool:
+    return (
+        usage["questions"] >= DAILY_QUESTION_LIMIT
+        or usage["all_questions"] >= GLOBAL_DAILY_QUESTION_LIMIT
+    )
+
+
+def render_usage_row(usage: dict) -> None:
+    """Small status row like Claude's: model name, thinking level, usage ring."""
+    used = usage["questions"]
+    fraction = min(used / DAILY_QUESTION_LIMIT, 1.0)
+    if usage_limit_reached(usage):
+        color = "#f87171"
+    elif fraction >= 0.8:
+        color = "#fbbf24"
+    else:
+        color = "#60a5fa"
+
+    total_tokens = usage["input_tokens"] + usage["output_tokens"]
+    tooltip = html.escape(
+        f"{used} of {DAILY_QUESTION_LIMIT} questions used today\n"
+        f"{format_tokens(total_tokens)} tokens "
+        f"({format_tokens(usage['input_tokens'])} in · "
+        f"{format_tokens(usage['output_tokens'])} out)\n"
+        "Resets daily at 00:00 UTC"
+    )
+    st.html(
+        f"""
+        <div class="usage-row">
+          <span class="model">{GEMINI_MODEL_LABEL}</span>
+          <span class="muted">{THINKING_LEVEL.capitalize()}</span>
+          <span class="ring" title="{tooltip}">
+            <span class="muted">{used}/{DAILY_QUESTION_LIMIT}</span>
+            <span class="dial" style="background: conic-gradient({color} {fraction * 360:.0f}deg, #3f3f46 0deg);"></span>
+          </span>
+        </div>
+        """
+    )
+
+
+def stream_llm_text(prompt: str, token_usage: dict):
+    """Stream Gemini's answer text and add up the tokens it reports."""
+    for chunk in get_llm(GEMINI_API_KEY).stream(prompt):
+        metadata = chunk.usage_metadata
+        if metadata:
+            token_usage["input"] += metadata.get("input_tokens", 0)
+            token_usage["output"] += metadata.get("output_tokens", 0)
+        yield chunk.text
+
+
 def queue_document_processing() -> None:
     st.session_state.is_processing = (
         st.session_state.get("file_uploader") is not None
@@ -179,9 +271,9 @@ if not GEMINI_API_KEY:
 @st.cache_resource
 def get_llm(api_key: str) -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model="gemini-3.5-flash-lite",
+        model=GEMINI_MODEL,
         google_api_key=api_key,
-        thinking_config={"thinking_level": "medium"},
+        thinking_config={"thinking_level": THINKING_LEVEL},
         max_retries=2,
         timeout=60,
     )
@@ -493,9 +585,26 @@ if st.session_state.messages:
         render_message(message, message_index)
 
 if st.session_state.document_uploaded and st.session_state.vector_db is not None:
-    query = st.chat_input("Ask a question about the document:")
+    usage = get_usage_today(st.session_state.chat_owner_id)
+    limit_reached = usage_limit_reached(usage)
+    # st._bottom is the area pinned under the chat, where st.chat_input lives.
+    bottom = st._bottom if hasattr(st, "_bottom") else st.container()
+    with bottom:
+        query = st.chat_input(
+            "Daily demo limit reached. Resets at 00:00 UTC."
+            if limit_reached
+            else "Ask a question about the document:",
+            disabled=limit_reached,
+        )
+        render_usage_row(usage)
     if query is None:
         query = st.session_state.pop("pending_question", None)
+    if query and limit_reached:
+        st.info(
+            "You've used today's free questions for this demo. Run it locally "
+            "with your own Gemini key for unlimited use (see the README)."
+        )
+        query = None
 
     if query:
         user_message = {"role": "user", "content": query}
@@ -517,9 +626,10 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
 
             sources = build_sources(documents)
             prompt = build_prompt(query, documents)
+            token_usage = {"input": 0, "output": 0}
 
             streamed_answer = answer_slot.write_stream(
-                chunk.text for chunk in get_llm(GEMINI_API_KEY).stream(prompt)
+                stream_llm_text(prompt, token_usage)
             )
             if not isinstance(streamed_answer, str):
                 raise TypeError("The streamed answer was not plain text.")
@@ -533,8 +643,7 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
                 )
                 with st.spinner("Checking the answer against the document..."):
                     answer = "".join(
-                        chunk.text
-                        for chunk in get_llm(GEMINI_API_KEY).stream(verification_prompt)
+                        stream_llm_text(verification_prompt, token_usage)
                     ).strip()
                 if not answer:
                     raise RuntimeError(
@@ -554,3 +663,9 @@ if st.session_state.document_uploaded and st.session_state.vector_db is not None
                 user_message,
                 {"role": "assistant", "content": answer, "sources": sources},
             )
+            record_usage(
+                st.session_state.chat_owner_id,
+                token_usage["input"],
+                token_usage["output"],
+            )
+            st.rerun()  # refresh the usage ring with this answer counted
