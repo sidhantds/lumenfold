@@ -50,7 +50,7 @@ THINKING_LEVEL = "medium"
 DAILY_QUESTION_LIMIT = 20  # per visitor
 GLOBAL_DAILY_QUESTION_LIMIT = 500  # across all visitors
 
-st.set_page_config(page_title="PDF Insight")
+st.set_page_config(page_title="Lumenfold")
 
 # Semantic colours per mode (base colours live in .streamlit/config.toml).
 # Teal = act / AI / verified · amber = review · red = risk or unsupported.
@@ -259,6 +259,56 @@ def render_usage_row(usage: dict) -> None:
     )
 
 
+def render_theme_toggle() -> None:
+    """Button that flips between light and dark mode.
+
+    Streamlit has no Python API for changing the viewer's theme, so the
+    button runs a tiny script that picks the mode in Streamlit's own menu
+    (⋮ → Light / Dark). Streamlit then remembers the choice in the browser.
+    A rerun afterwards lets the custom colours above match the new mode.
+    """
+    is_light = st.context.theme.type == "light"
+    target = "Dark" if is_light else "Light"
+    if st.button(
+        f"{target} mode",
+        icon=":material/dark_mode:" if is_light else ":material/light_mode:",
+        key="theme_toggle",
+        use_container_width=True,
+    ):
+        st.html(
+            f"""
+            <script>
+            (async () => {{
+              const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+              const menuButton = '[data-testid="stMainMenuButton"]';
+              async function choose(testId) {{
+                const selector = `[data-testid="${{testId}}"]`;
+                if (!document.querySelector(selector)) {{
+                  document.querySelector(menuButton)?.click();  // open the menu
+                }}
+                for (let i = 0; i < 40; i++) {{
+                  const item = document.querySelector(selector);
+                  if (item) {{ item.click(); return true; }}
+                  await sleep(25);
+                }}
+                return false;
+              }}
+              // Decide from what is on screen, so a stale label can't flip it wrong.
+              const bg = getComputedStyle(document.querySelector(".stApp")).backgroundColor;
+              const [r, g, b] = bg.match(/\\d+/g).map(Number);
+              const isLight = (r + g + b) / 3 > 128;
+              await choose(isLight ? "stMainMenuItem-theme-Dark" : "stMainMenuItem-theme-Light");
+              // Let Streamlit register the new theme before rerunning, so
+              // st.context.theme (and the custom colours) see the new mode.
+              await sleep(600);
+              await choose("stMainMenuItem-rerun");
+            }})();
+            </script>
+            """,
+            unsafe_allow_javascript=True,
+        )
+
+
 def stream_llm_text(prompt: str, token_usage: dict):
     """Stream Gemini's answer text and add up the tokens it reports."""
     for chunk in get_llm(GEMINI_API_KEY).stream(prompt):
@@ -442,7 +492,8 @@ def render_message(message, message_index: int) -> None:
         render_sources(sources, message_index)
 
 with st.sidebar:
-    st.header("PdfInsight")
+    st.header("Lumenfold")
+    render_theme_toggle()
     if st.button("New chat", use_container_width=True):
         chat_owner_id = st.session_state.chat_owner_id
         st.session_state.clear()
@@ -529,7 +580,7 @@ if st.session_state.history_load_error:
 
 title_column, document_badge_column = st.columns([3, 1])
 with title_column:
-    st.title("PdfInsight")
+    st.title("Lumenfold")
 if st.session_state.document_uploaded:
     with document_badge_column:
         with st.container(border=True):

@@ -20,7 +20,7 @@
 
   <rect width="1000" height="520" rx="14" fill="#000000"/>
 
-  <text x="24" y="38" fill="#ffffff" font-size="19" font-weight="700">PdfInsight · RAG pipeline</text>
+  <text x="24" y="38" fill="#ffffff" font-size="19" font-weight="700">Lumenfold · RAG pipeline</text>
   <text x="976" y="38" fill="#8b949e" font-size="11" text-anchor="end">Streamlit · LangChain · Hugging Face · FAISS · Gemini · SQLite</text>
 
   <!-- ============ INGESTION ============ -->

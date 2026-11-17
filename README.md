@@ -1,6 +1,6 @@
 <div align="center">
 
-# PdfInsight
+# Lumenfold
 
 **Chat with any PDF and get grounded answers with page-level citations.**
 
@@ -19,7 +19,7 @@
 
 <br><br>
 
-<img src="docs/screenshots/answer.png" alt="PdfInsight answering a question about a PDF with page citations" width="900">
+<img src="docs/screenshots/answer.png" alt="Lumenfold answering a question about a PDF with page citations" width="900">
 
 </div>
 
@@ -27,9 +27,9 @@
 
 ## Overview
 
-PdfInsight is a **retrieval-augmented generation (RAG)** app for question answering over PDFs. Upload a document and ask questions in plain English. The app finds the passages most relevant to your question, has Gemini answer **only from those passages**, and shows the source pages so you can check every claim yourself.
+Lumenfold is a **retrieval-augmented generation (RAG)** app for question answering over PDFs. Upload a document and ask questions in plain English. The app finds the passages most relevant to your question, has Gemini answer **only from those passages**, and shows the source pages so you can check every claim yourself.
 
-**Why it's useful:** general chatbots answer from memory and can make things up. PdfInsight answers from *your* document. When the answer isn't there, it says so instead of guessing.
+**Why it's useful:** general chatbots answer from memory and can make things up. Lumenfold answers from *your* document. When the answer isn't there, it says so instead of guessing.
 
 ## Live demo
 
@@ -67,7 +67,7 @@ PdfInsight is a **retrieval-augmented generation (RAG)** app for question answer
 
 ## How it works
 
-<img src="docs/pipeline.svg" alt="PdfInsight RAG pipeline: ingestion and query flow" width="100%">
+<img src="docs/pipeline.svg" alt="Lumenfold RAG pipeline: ingestion and query flow" width="100%">
 
 **Ingestion (once per document)**
 1. **Fingerprint:** the PDF's SHA-256 hash is looked up in SQLite. On a cache hit, the saved vector index is loaded and steps 2–4 are skipped.
